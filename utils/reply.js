@@ -1,0 +1,22 @@
+const axios = require('axios');
+
+// ใส่ Channel Access Token ของคุณตรงนี้
+const LINE_TOKEN = 'YOUR_LINE_CHANNEL_ACCESS_TOKEN';
+
+async function replyMessage(userId, message) {
+  try {
+    await axios.post('https://api.line.me/v2/bot/message/push', {
+      to: userId,
+      messages: [{ type: 'text', text: message }],
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LINE_TOKEN}`
+      }
+    });
+  } catch (err) {
+    console.error('❌ Error sending message:', err.response?.data || err.message);
+  }
+}
+
+module.exports = { replyMessage };
