@@ -1,38 +1,28 @@
 const express = require('express');
 const app = express();
+const consent = require('./modules/consent');
+const finance = require('./modules/finance');
+
 app.use(express.json());
 
-// เก็บ state ของ user (ทดลอง ใช้ memory)
+// เก็บ state ของ user
 const userStates = {};
 
 app.post('/webhook', (req, res) => {
-  const event = req.body.events[0];
+  const event = req.body.events?.[0];
+  if (!event || event.type !== 'message') return res.sendStatus(200);
+
   const userId = event.source.userId;
   const text = event.message.text;
 
-  // ตรวจสอบ state ของ user
-  if (!userStates[userId]) userStates[userId] = 'start';
-
-  if (userStates[userId] === 'start') {
-    // ต้นทาง tree
-    userStates[userId] = 'waiting_for_income_type';
-    replyMessage(userId, 'คุณเป็นเงินเดือนหรือ freelance?');
-  } else if (userStates[userId] === 'waiting_for_income_type') {
-    if (text.includes('เงินเดือน')) {
-      userStates[userId] = 'waiting_for_job_type';
-      replyMessage(userId, 'คุณทำงานราชการหรือเอกชน?');
-    } else if (text.includes('freelance')) {
-      userStates[userId] = 'waiting_for_vat';
-      replyMessage(userId, 'คุณจด VAT หรือไม่?');
-    }
+  // ถ้ายังไม่ได้ยินยอม PDPA
+  if (!userStates[userId]?.consent) {
+    return consent.handleConsent(userId, text, userStates);
   }
 
+  // ถ้า consent แล้ว เข้าสู่หมวด “เรื่องการเงินกับน้องฟิน”
+  finance.handleFinance(userId, text, userStates);
   res.sendStatus(200);
 });
 
-function replyMessage(userId, message) {
-  console.log(`Reply to ${userId}: ${message}`);
-  // ตรงนี้ต่อ LINE Messaging API ส่งข้อความจริง
-}
-
-app.listen(3000, () => console.log('Bot running'));
+app.listen(3000, () => console.log('🤖 Finway Bot running on port 3000'));
