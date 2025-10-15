@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // ใส่ Channel Access Token ของคุณตรงนี้
-const LINE_TOKEN = 'YOUR_LINE_CHANNEL_ACCESS_TOKEN';
+const LINE_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 
 async function replyMessage(userId, message) {
   try {
