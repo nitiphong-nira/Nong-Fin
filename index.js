@@ -64,3 +64,7 @@ process.on('SIGINT', () => {
   console.log('🛑 SIGINT received. Shutting down...');
   process.exit(0);
 });
+
+const PORT = process.env.PORT || 8080;
+app.get('/', (req, res) => res.send('✅ Finway Bot is running'));
+app.listen(PORT, () => console.log(`🚀 Bot running on port ${PORT}`));
