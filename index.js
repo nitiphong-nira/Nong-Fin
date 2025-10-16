@@ -10,13 +10,12 @@ const { replyMessage } = require('./utils/reply');
 const app = express();
 app.use(bodyParser.json());
 
-// เก็บ state ของ user (ในหน่วยความจำ — สำหรับ production ควรใช้ DB เช่น Redis)
+// เก็บ state ของ user (สำหรับ production แนะนำ DB)
 const userStates = {};
 
 // ===== Webhook Handler =====
 app.post('/webhook', (req, res) => {
-  // ตอบกลับ LINE ทันที เพื่อป้องกัน timeout / 502
-  res.sendStatus(200);
+  res.sendStatus(200); // ตอบทันทีเพื่อป้องกัน timeout
 
   try {
     const event = req.body.events?.[0];
@@ -27,15 +26,15 @@ app.post('/webhook', (req, res) => {
 
     if (!userStates[userId]) userStates[userId] = 'waiting_for_consent';
 
-    // ----- PDPA Consent Flow -----
+    // PDPA Consent
     if (userStates[userId] === 'waiting_for_consent') {
       consent.handleConsent(userId, text, userStates, replyMessage);
     }
-    // ----- Finance Flow -----
+    // Finance Flow
     else if (userStates[userId].startsWith('finance_')) {
       finance.handleFinance(userId, text, userStates, replyMessage);
     }
-    // ----- Default Fallback -----
+    // Fallback
     else {
       replyMessage(userId, "พิมพ์ 'เริ่มต้น' เพื่อเริ่มใช้งานระบบนะครับ 🙂");
       userStates[userId] = 'waiting_for_consent';
@@ -45,12 +44,10 @@ app.post('/webhook', (req, res) => {
   }
 });
 
-// ===== Health Check Endpoint =====
-app.get('/', (req, res) => {
-  res.send('✅ Finway Bot is running');
-});
+// Health check
+app.get('/', (req, res) => res.send('✅ Finway Bot is running'));
 
-// ===== Start Server =====
+// Start server
 const PORT = process.env.PORT;
 if (!PORT) {
   console.error('❌ PORT not defined!');
@@ -58,12 +55,6 @@ if (!PORT) {
 }
 app.listen(PORT, () => console.log(`🚀 Bot running on port ${PORT}`));
 
-// Graceful Shutdown
-process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM received. Shutting down gracefully...');
-  process.exit(0);
-});
-process.on('SIGINT', () => {
-  console.log('🛑 SIGINT received. Shutting down...');
-  process.exit(0);
-});
+// Graceful shutdown
+process.on('SIGTERM', () => process.exit(0));
+process.on('SIGINT', () => process.exit(0));
