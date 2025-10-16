@@ -1,9 +1,10 @@
 const axios = require('axios');
 
+// ใช้ environment variable
 const LINE_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 
 if (!LINE_TOKEN) {
-  console.error('❌ CHANNEL_ACCESS_TOKEN is not set in environment variables!');
+  console.error('❌ CHANNEL_ACCESS_TOKEN is not set!');
 }
 
 async function replyMessage(userId, message) {
