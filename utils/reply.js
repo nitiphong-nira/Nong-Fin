@@ -1,6 +1,6 @@
+// utils/reply.js
 const axios = require('axios');
 
-// ใส่ Channel Access Token ของคุณตรงนี้
 const LINE_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 
 async function replyMessage(userId, message) {
@@ -11,7 +11,7 @@ async function replyMessage(userId, message) {
     }, {
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LINE_TOKEN}`
+        'Authorization': `Bearer ${LINE_TOKEN}`,
       }
     });
   } catch (err) {
