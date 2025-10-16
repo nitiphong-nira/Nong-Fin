@@ -15,7 +15,7 @@ const userStates = {};
 
 // ===== Webhook Handler =====
 app.post('/webhook', (req, res) => {
-  // ตอบกลับ LINE ทันที ป้องกัน timeout (สำคัญมาก)
+  // ตอบกลับ LINE ทันที ป้องกัน timeout
   res.sendStatus(200);
 
   const event = req.body.events?.[0];
@@ -37,7 +37,7 @@ app.post('/webhook', (req, res) => {
     finance.handleFinance(userId, text, userStates, replyMessage);
   }
 
-  // ----- Default Fallback -----
+  // ----- Default -----
   else {
     replyMessage(userId, "พิมพ์ 'เริ่มต้น' เพื่อเริ่มใช้งานระบบนะครับ 🙂");
     userStates[userId] = 'waiting_for_consent';
@@ -50,12 +50,12 @@ app.get('/', (req, res) => {
 });
 
 // ===== Start Server =====
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🚀 Bot running on port ${PORT}`);
 });
 
-// Graceful Shutdown (กัน SIGTERM error)
+// ===== Graceful Shutdown =====
 process.on('SIGTERM', () => {
   console.log('🛑 SIGTERM received. Shutting down gracefully...');
   process.exit(0);
@@ -64,7 +64,3 @@ process.on('SIGINT', () => {
   console.log('🛑 SIGINT received. Shutting down...');
   process.exit(0);
 });
-
-const PORT = process.env.PORT || 8080;
-app.get('/', (req, res) => res.send('✅ Finway Bot is running'));
-app.listen(PORT, () => console.log(`🚀 Bot running on port ${PORT}`));
