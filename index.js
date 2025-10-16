@@ -38,7 +38,7 @@ app.post('/webhook', async (req, res) => {
 
 app.get('/', (req, res) => res.send('✅ Finway Bot is running'));
 
-const PORT = parseInt(process.env.PORT, 10) || 3000;
+const PORT = parseInt(process.env.PORT, 10);
 app.listen(PORT, () => console.log(`🚀 Bot running on port ${PORT}`));
 
 process.on('SIGTERM', () => process.exit(0));
