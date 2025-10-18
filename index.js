@@ -68,13 +68,11 @@ const rawPort = process.env.PORT;
 const PORT = Number.parseInt(rawPort, 10);
 if (!PORT || Number.isNaN(PORT)) {
   console.error('❌ process.env.PORT is not defined or invalid. Current value:', rawPort);
-  // EXIT so deployment failure is visible instead of silent mis-binding
   process.exit(1);
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Bot running on port ${PORT}`);
-  // helpful for debugging from logs
   console.log('Environment variables:', {
     NODE_ENV: process.env.NODE_ENV || 'n/a',
     CHANNEL_ACCESS_TOKEN_set: !!process.env.CHANNEL_ACCESS_TOKEN,
