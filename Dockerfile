@@ -12,8 +12,8 @@ RUN npm install --production
 COPY . .
 
 # กำหนด environment port (Cloud Run ใช้ PORT ของมันเอง)
+ENV GOOGLE_APPLICATION_CREDENTIALS=/app/keys/nong-fin-7afd3f9f52e4.json
 ENV PORT=8080
-EXPOSE 8080
 
 # รัน bot
 CMD ["node", "index.js"]
