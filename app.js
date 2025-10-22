@@ -5,7 +5,7 @@ import lineRouter from './modules/line.js';
 const app = express();
 app.use(bodyParser.json());
 
-// Health check route
+// Health check
 app.get('/', (req, res) => {
   res.json({
     status: 'OK',
@@ -14,12 +14,13 @@ app.get('/', (req, res) => {
   });
 });
 
-// ✅ ต้องมี route นี้แน่นอน!
+// Webhook route - ทั้งสองแบบเพื่อความชัวร์
 app.post('/webhook', lineRouter);
 
-// ✅ เพิ่ม fallback route สำหรับ 404
-app.use('*', (req, res) => {
-  res.status(200).send('OK'); // LINE ต้องการ 200 เสมอ
+// ✅ สำรอง: Route โดยตรงถ้า lineRouter มีปัญหา
+app.post('/webhook', (req, res) => {
+  console.log('📩 Direct webhook called');
+  res.status(200).json({ status: 'OK' });
 });
 
 export default app;
