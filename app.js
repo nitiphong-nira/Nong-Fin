@@ -1,6 +1,5 @@
 import express from 'express';
 import bodyParser from 'body-parser';
-import lineRouter from './modules/line.js'; // นำกลับมาใช้
 
 const app = express();
 app.use(bodyParser.json());
@@ -14,7 +13,16 @@ app.get('/', (req, res) => {
   });
 });
 
-// ✅ มีเพียง SINGLE webhook route
-app.post('/webhook', lineRouter);
+// ✅ Webhook route โดยตรง (ไม่ใช้ router)
+app.post('/webhook', (req, res) => {
+  console.log('📩 Webhook received - LINE verification');
+  
+  // ✅ ส่ง 200 OK ทันที
+  res.status(200).json({ status: 'OK' });
+  
+  // Process events ในพื้นหลัง
+  const events = req.body.events || [];
+  console.log(`Processing ${events.length} events`);
+});
 
 export default app;
