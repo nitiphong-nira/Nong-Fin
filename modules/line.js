@@ -1,27 +1,61 @@
 import express from 'express';
+import axios from 'axios';
 
 const router = express.Router();
 
-// ✅ ต้องมี method POST ที่ path '/'
-router.post('/', async (req, res) => {
+// ฟังก์ชันส่งข้อความกลับไปยัง LINE
+async function replyMessage(replyToken, message) {
+  if (!process.env.CHANNEL_ACCESS_TOKEN) {
+    console.warn('⚠️ Missing CHANNEL_ACCESS_TOKEN');
+    return;
+  }
+
   try {
-    console.log('📩 Received webhook request');
-    
-    // ✅ สำคัญ: ส่ง 200 OK ทันที
-    res.status(200).json({ status: 'OK' });
-    
-    // Process events ในพื้นหลัง
-    const events = req.body.events || [];
-    for (const event of events) {
-      console.log('Processing event:', event.type);
-      // Your bot logic here
-    }
-    
+    await axios.post(
+      'https://api.line.me/v2/bot/message/reply',
+      {
+        replyToken,
+        messages: [{ type: 'text', text: message }],
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CHANNEL_ACCESS_TOKEN}`,
+        },
+      }
+    );
+    console.log('✅ Reply sent');
   } catch (error) {
-    console.error('Webhook error:', error);
-    // ✅ ถึงมี error ก็ส่ง 200 OK
-    res.status(200).json({ status: 'OK' });
+    console.error('❌ LINE API error:', error.response?.data || error.message);
+  }
+}
+
+// Webhook Route หลัก
+router.post('/', async (req, res) => {
+  // ตอบกลับทันที
+  res.status(200).json({ status: 'OK' });
+
+  const events = req.body.events || [];
+  console.log(`📩 Received ${events.length} event(s)`);
+
+  for (const event of events) {
+    try {
+      if (event.type === 'message' && event.message?.type === 'text') {
+        await handleMessage(event);
+      }
+    } catch (err) {
+      console.error('❌ Error:', err.message);
+    }
   }
 });
+
+// จัดการข้อความ
+async function handleMessage(event) {
+  const userMsg = event.message.text.trim();
+  console.log(`💬 User: ${userMsg}`);
+
+  // ตอบกลับแบบง่ายๆ
+  await replyMessage(event.replyToken, `ได้รับข้อความ: "${userMsg}" 👍`);
+}
 
 export default router;
