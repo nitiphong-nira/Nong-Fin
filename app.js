@@ -13,7 +13,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// ✅ Webhook route โดยตรง (ไม่ใช้ router)
+// ✅ Webhook route โดยตรง (ไม่ใช้ lineRouter)
 app.post('/webhook', (req, res) => {
   console.log('📩 Webhook received - LINE verification');
   
