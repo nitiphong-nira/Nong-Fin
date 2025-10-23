@@ -3,7 +3,6 @@ import app from './app.js';
 const rawPort = process.env.PORT;
 const PORT = parseInt(rawPort, 10) || 3000;
 
-// ตรวจสอบ environment variables แบบเร็วขึ้น
 if (process.env.NODE_ENV === 'production') {
   const required = ['CHANNEL_ACCESS_TOKEN', 'CHANNEL_SECRET'];
   const missing = required.filter(key => !process.env[key]);
@@ -13,14 +12,15 @@ if (process.env.NODE_ENV === 'production') {
   }
 }
 
-// Start server ทันทีโดยไม่รอ Google Sheets ใน callback
+// Start server
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Nong-Fin bot running on port ${PORT}`);
   console.log(`📍 Health: http://0.0.0.0:${PORT}/`);
+  console.log(`📍 Webhook: http://0.0.0.0:${PORT}/webhook`);
   console.log(`⏰ Startup time: ${process.uptime().toFixed(2)}s`);
 });
 
-// Initialize Google Sheets ในพื้นหลัง (ไม่บล็อก startup)
+// Initialize Google Sheets ในพื้นหลัง
 import('./modules/sheets.js')
   .then(async (sheets) => {
     try {
@@ -34,7 +34,7 @@ import('./modules/sheets.js')
     console.warn('📦 Sheets module load deferred:', err.message);
   });
 
-// Graceful shutdown สำหรับ Railway
+// Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('🛑 Received SIGTERM, shutting down gracefully...');
   server.close(() => {
