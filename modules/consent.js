@@ -1,160 +1,160 @@
-// modules/consent.js
-const { google } = require('googleapis');
-const { replyMessage } = require('../utils/reply');
-const path = require('path');
-const fs = require('fs');
+import { replyMessage } from './utils.js';
+import { getSheetsClient } from './sheets.js';
 
-// Path ไปยัง JSON key ของ Service Account
-const KEYFILEPATH = path.join(__dirname, '../keys/nong-fin-7afd3f9f52e4.json');
+// Google Sheets configuration
+const SHEET_NAME = 'Finway_PDPA_Consent';
+const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
 
-// Spreadsheet ID ของ Google Sheet
-const SPREADSHEET_ID = '13BHy3XWsSQQAzFXA8jBL1XRAor_0ZQeUfEmGw0pqPbo';
-const SHEET_NAME = 'Sheet1'; // ชื่อ sheet
-
-// สร้าง Google Sheets client
-const auth = new google.auth.GoogleAuth({
-  keyFile: KEYFILEPATH,
-  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-});
-
-const sheets = google.sheets({ version: 'v4', auth });
-
-// --- เช็ค consent ของ userId ใน Google Sheet ---
-async function checkConsent(lineId) {
+// ฟังก์ชันบันทึก Consent ลง Google Sheets
+async function saveConsentToSheet(userId, consentResult) {
   try {
-    const res = await sheets.spreadsheets.values.get({
+    const sheets = await getSheetsClient();
+    
+    await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A2:F`, // ข้อมูลเริ่มจาก row 2
+      range: `${SHEET_NAME}!A:F`,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [[
+          new Date().toISOString(), // Timestamp
+          '',                       // name (ว่างไว้กรอกทีหลัง)
+          '',                       // surname (ว่างไว้กรอกทีหลัง)
+          userId,                   // line ID (สำคัญที่สุด)
+          '',                       // Phone number (ว่างไว้กรอกทีหลัง)
+          consentResult             // consent result
+        ]]
+      }
     });
+    
+    console.log(`✅ Consent saved for LINE ID: ${userId}`);
+  } catch (error) {
+    console.error('❌ Error saving consent to sheet:', error.message);
+  }
+}
 
-    const rows = res.data.values || [];
-    const userRow = rows.find(row => row[3] === lineId); // column D = line ID
-    if (!userRow) return null; // ยังไม่ consent
-    return userRow[5]; // column F = consent result
-  } catch (err) {
-    console.error('❌ Error checking consent:', err);
+// ฟังก์ชันตรวจสอบ Consent จาก Google Sheets (ตรวจจาก Line ID)
+async function getUserConsentFromSheet(userId) {
+  try {
+    const sheets = await getSheetsClient();
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SHEET_NAME}!A:F`,
+    });
+    
+    const rows = response.data.values || [];
+    
+    // 🔍 หาจาก Line ID (column D) ว่ามี record ไหนที่ accepted บ้าง
+    const userAcceptedRecords = rows.filter(row => 
+      row[3] === userId && row[5] === 'accepted' // column D = Line ID, column F = consent result
+    );
+    
+    if (userAcceptedRecords.length > 0) {
+      const latestRecord = userAcceptedRecords[userAcceptedRecords.length - 1];
+      return {
+        consented: true,
+        consentedAt: new Date(latestRecord[0]), // column A = timestamp
+        lineId: latestRecord[3]                 // column D = Line ID
+      };
+    }
+    
+    return null; // ไม่พบ record ที่ accepted
+  } catch (error) {
+    console.error('❌ Error reading consent from sheet:', error.message);
     return null;
   }
 }
 
-// --- บันทึก consent ลง Google Sheet ---
-async function saveConsent({ timestamp, name, surname, lineId, phone, consentResult }) {
+// ฟังก์ชันส่ง Consent Form
+export async function sendConsentForm(replyToken, userId) {
+  const consentMessage = 
+`📋 *ข้อตกลงและเงื่อนไขการใช้งาน Nong-Fin*
+
+ก่อนเริ่มใช้งาน บอท Nong-Fin ต้องการ您的ความยินยอมในการ:
+
+✅ บันทึกและประมวลผลข้อมูลการเงิน
+✅ เก็บข้อมูลเพื่อการวิเคราะห์และพัฒนาบริการ
+✅ นำข้อมูลไปใช้ในการให้คำแนะนำทางการเงิน
+
+*ข้อมูลของคุณจะถูกเก็บเป็นความลับและใช้เพื่อการพัฒนาบริการเท่านั้น*
+
+หากยินยอม กรุณาพิมพ์ "ยอมรับ"
+หากไม่ยอมรับ พิมพ์ "ไม่ยอมรับ"`;
+
+  await replyMessage(replyToken, consentMessage);
+}
+
+// ตรวจสอบว่ายินยอมแล้วหรือไม่ (จาก Line ID)
+export async function hasUserConsented(userId) {
   try {
-    await sheets.spreadsheets.values.append({
+    const consentData = await getUserConsentFromSheet(userId);
+    return consentData ? consentData.consented : false;
+  } catch (error) {
+    console.error('❌ Error checking user consent:', error.message);
+    return false;
+  }
+}
+
+// จัดการ Consent Flow
+export async function handleConsentFlow(event, userMsg, userId) {
+  // ✅ ตรวจสอบจาก Line ID ว่ายินยอมแล้วหรือยัง
+  const hasConsented = await hasUserConsented(userId);
+  
+  if (hasConsented) {
+    console.log(`✅ User ${userId} already consented - proceeding to finance`);
+    // ถ้ายินยอมแล้ว -> ส่งไป finance
+    const { handleFinanceCommand } = await import('./finance.js');
+    await handleFinanceCommand(event, userMsg, userId);
+    return;
+  }
+
+  // ยังไม่ยินยอม -> ตรวจสอบคำตอบ
+  if (userMsg === 'ยอมรับ') {
+    console.log(`✅ User ${userId} accepted consent`);
+    // ✅ บันทึก consent accepted
+    await saveConsentToSheet(userId, 'accepted');
+    await replyMessage(event.replyToken, 
+      `✅ ขอบคุณสำหรับความไว้วางใจ! 
+คุณสามารถเริ่มใช้งาน Nong-Fin ได้แล้ว
+
+พิมพ์ "ช่วยเหลือ" เพื่อดูเมนูทั้งหมด`);
+  } 
+  else if (userMsg === 'ไม่ยอมรับ') {
+    console.log(`❌ User ${userId} rejected consent`);
+    // ✅ บันทึก consent rejected
+    await saveConsentToSheet(userId, 'rejected');
+    await replyMessage(event.replyToken, 
+      `❌ ขออภัย คุณต้องยอมรับข้อตกลงก่อนจึงจะใช้งาน Nong-Fin ได้
+หากเปลี่ยนใจ สามารถพิมพ์ "ยอมรับ" ได้ตลอดเวลา`);
+  }
+  else {
+    // ข้อความอื่นๆ -> ส่ง consent form อีกครั้ง
+    console.log(`📋 Sending consent form to user ${userId}`);
+    await sendConsentForm(event.replyToken, userId);
+  }
+}
+
+// ฟังก์ชันดูประวัติ Consent ของ user (สำหรับ debugging)
+export async function getUserConsentHistory(userId) {
+  try {
+    const sheets = await getSheetsClient();
+    
+    const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: `${SHEET_NAME}!A:F`,
-      valueInputOption: 'USER_ENTERED',
-      resource: {
-        values: [[timestamp, name, surname, lineId, phone, consentResult]],
-      },
     });
-  } catch (err) {
-    console.error('❌ Error saving consent:', err);
+    
+    const rows = response.data.values || [];
+    
+    // หาทุก record ของ Line ID นี้
+    const userRecords = rows.filter(row => row[3] === userId);
+    return userRecords.map(record => ({
+      timestamp: record[0],
+      consentResult: record[5]
+    }));
+  } catch (error) {
+    console.error('❌ Error getting user consent history:', error.message);
+    return [];
   }
 }
-
-// --- ฟังก์ชันหลักจัดการ consent ---
-async function handleConsent(userId, text, userStates) {
-  try {
-    const existingConsent = await checkConsent(userId);
-
-    if (!existingConsent) {
-      // ยังไม่เคย consent
-      userStates[userId] = { consent: false };
-
-      const pdpaNotice = `
-📜 **นโยบายความเป็นส่วนตัว (PDPA Consent)**
-
-น้องฟินจะเก็บและใช้ข้อมูลต่อไปนี้เพื่อให้บริการ:
-• ข้อความที่คุณพิมพ์ในแชท  
-• ข้อมูลผู้ใช้ (LINE userId)  
-• คำตอบในการคำนวณหรือวางแผนการเงิน  
-
-ข้อมูลจะถูกเก็บไว้เพื่อ:
-✅ ให้คำแนะนำด้านการเงินส่วนบุคคล  
-✅ ปรับปรุงบริการและประสบการณ์การใช้งาน  
-❌ จะไม่เปิดเผยแก่บุคคลที่สามโดยไม่ได้รับอนุญาต  
-
-อ่านรายละเอียดนโยบายเต็มได้ที่:  
-👉 https://www.notion.so/Privacy-Policy-28b3d2318ce980b98771db7919f6ff20?source=copy_link  
-
-คุณยินยอมให้น้องฟินเก็บข้อมูลส่วนตัวเพื่อให้บริการหรือไม่?
-
-1️⃣ พิมพ์ “ยินยอม”  
-2️⃣ พิมพ์ “ไม่ยินยอม”
-`;
-
-      await replyMessage(userId, pdpaNotice);
-      return;
-    }
-
-    // --- มี record แล้ว ---
-    if (existingConsent === 'ยินยอม') {
-      userStates[userId] = { consent: true };
-      return; // ไม่ต้องถามซ้ำ
-    } else if (existingConsent === 'ไม่ยินยอม') {
-      userStates[userId] = { consent: false };
-      return; // ไม่ต้องถามซ้ำ
-    }
-
-    // --- ถ้าผู้ใช้พิมพ์ตอบ consent ---
-    const normalized = (text || '').trim().toLowerCase();
-
-    if (normalized.includes('ยินยอม')) {
-      userStates[userId].consent = true;
-      const timestamp = new Date().toISOString();
-      await saveConsent({
-        timestamp,
-        name: '', // ถ้าต้องกรอก
-        surname: '',
-        lineId: userId,
-        phone: '',
-        consentResult: 'ยินยอม',
-      });
-      await replyMessage(userId, 'ขอบคุณที่ยินยอม ❤️ น้องฟินพร้อมช่วยคุณแล้วค่ะ!');
-      return;
-    }
-
-    if (normalized.includes('ไม่ยินยอม')) {
-      userStates[userId].consent = false;
-      const timestamp = new Date().toISOString();
-      await saveConsent({
-        timestamp,
-        name: '',
-        surname: '',
-        lineId: userId,
-        phone: '',
-        consentResult: 'ไม่ยินยอม',
-      });
-      await replyMessage(userId, 'น้องฟินจะไม่เก็บข้อมูลของคุณ ขอบคุณที่แวะมานะคะ 🙏');
-      return;
-    }
-
-    await replyMessage(userId, `
-📜 **นโยบายความเป็นส่วนตัว (PDPA Consent)**
-
-น้องฟินจะเก็บและใช้ข้อมูลต่อไปนี้เพื่อให้บริการ:
-• ข้อความที่คุณพิมพ์ในแชท  
-• ข้อมูลผู้ใช้ (LINE userId)  
-• คำตอบในการคำนวณหรือวางแผนการเงิน  
-
-ข้อมูลจะถูกเก็บไว้เพื่อ:
-✅ ให้คำแนะนำด้านการเงินส่วนบุคคล  
-✅ ปรับปรุงบริการและประสบการณ์การใช้งาน  
-❌ จะไม่เปิดเผยแก่บุคคลที่สามโดยไม่ได้รับอนุญาต  
-
-อ่านรายละเอียดนโยบายเต็มได้ที่:  
-👉 https://www.notion.so/Privacy-Policy-28b3d2318ce980b98771db7919f6ff20?source=copy_link  
-
-คุณยินยอมให้น้องฟินเก็บข้อมูลส่วนตัวเพื่อให้บริการหรือไม่?
-
-1️⃣ พิมพ์ “ยินยอม”  
-2️⃣ พิมพ์ “ไม่ยินยอม”
-`);
-  } catch (err) {
-    console.error('❌ Error in handleConsent:', err);
-    await replyMessage(userId, 'ขออภัยค่ะ ระบบขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง 🙏');
-  }
-}
-
-module.exports = { handleConsent };
