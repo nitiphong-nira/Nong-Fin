@@ -1,9 +1,8 @@
-const { ConsentManager } = require('../auth/consent');
+const { createConsentFlex } = require('../messages/flex-consent');
 const LineAPI = require('../utils/line-api');
 
 class MessageRouter {
   constructor() {
-    this.consentManager = new ConsentManager();
     this.botPaused = false;
     this.ADMIN_ID = process.env.ADMIN_LINE_ID;
   }
@@ -12,6 +11,8 @@ class MessageRouter {
     const { replyToken, message, source } = event;
     const userId = source.userId;
     const userMessage = message.text;
+
+    console.log(`📝 User ${userId} said: ${userMessage}`);
 
     // ตรวจสอบคำสั่ง Admin
     if (userMessage === '!หยุด' && userId === this.ADMIN_ID) {
@@ -41,27 +42,9 @@ class MessageRouter {
       return;
     }
 
-    // ตรวจสอบการยินยอม
-    const hasConsent = await this.consentManager.checkConsent(userId);
-    
-    if (!hasConsent) {
-      // ยังไม่ยินยอม - ส่ง PDPA Consent
-      await this.consentManager.requestConsent(replyToken);
-    } else {
-      // ยินยอมแล้ว - แสดงเมนูหรือประมวลผลข้อความ
-      await this.handleConsentedUser(event);
-    }
-  }
-
-  async handleConsentedUser(event) {
-    const { replyToken, message } = event;
-    
-    // ส่งเมนู Rich Menu (Line จะจัดการให้อัตโนมัติ)
-    // หรือประมวลผลข้อความตาม features
-    await LineAPI.replyMessage(replyToken, {
-      type: 'text',
-      text: 'ยินดีต้อนรับ! กรุณาเลือกเมนูด้านล่าง'
-    });
+    // 🎯 ส่ง PDPA Consent ทุกครั้ง (ชั่วคราว)
+    const flexMessage = createConsentFlex();
+    await LineAPI.replyMessage(replyToken, flexMessage);
   }
 }
 
