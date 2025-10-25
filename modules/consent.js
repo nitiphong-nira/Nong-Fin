@@ -1,103 +1,150 @@
-import { replyMessage } from './utils.js';
+import { replyMessage, replyFlexMessage } from './utils.js';
+import { 
+  consentFlexMessage,
+  userInfoFlexMessage,
+  exampleFlexMessage 
+} from './flex-messages.js';
+import { checkUserConsent, saveConsentToSheets, saveUserInfoToSheets } from './sheets.js';
 
-const userConsents = new Map();
-const userProfiles = new Map(); // เก็บข้อมูลผู้ใช้
-const userTaxData = new Map(); // เก็บข้อมูลภาษี
+const userProfiles = new Map();
+const userStates = new Map();
 
 export async function handleConsent(event, userMsg, userId) {
-  // ถ้ายังไม่ยินยอม
-  if (!userConsents.get(userId)) {
+  // Step 0: ตรวจสอบ Line ID ใน Sheets ก่อน
+  const hasConsented = await checkUserConsent(userId);
+  
+  if (hasConsented) {
+    // Step 3: เคยยินยอมแล้ว -> ไป Rich Menu
+    await handleMainMenu(event, userMsg, userId);
+  } else {
+    // Step 1: ยังไม่เคยยินยอม
     await handleConsentFlow(event, userMsg, userId);
-    return;
   }
-
-  // ถ้ายินยอมแล้ว -> ไปที่ฟังก์ชันภาษี
-  await handleTaxFlow(event, userMsg, userId);
 }
 
 async function handleConsentFlow(event, userMsg, userId) {
-  if (userMsg === 'ยินยอม') {
-    userConsents.set(userId, true);
-    await replyMessage(event.replyToken,
-`✅ ขอบคุณที่ไว้วางใจ! 
-
-เราจะช่วยคุณคำนวณและจัดการภาษี
-
-พิมพ์ "คำนวณภาษี" เพื่อเริ่มต้น
-หรือ "ช่วยเหลือ" เพื่อดูคำสั่งทั้งหมด`
-    );
-  } else {
-    await replyMessage(event.replyToken,
-`📋 *Nong-Fin Tax Bot*
-ช่วยคุณคำนวณภาษีและให้คำแนะนำการเงิน
-
-พิมพ์ "ยินยอม" เพื่อเริ่มใช้งาน`
-    );
-  }
-}
-
-async function handleTaxFlow(event, userMsg, userId) {
-  const userState = userTaxData.get(userId)?.state || 'idle';
-
-  switch (userMsg.toLowerCase()) {
-    case 'คำนวณภาษี':
-    case 'calc':
-    case 'tax':
-      await startTaxCalculation(event, userId);
+  // จำกัดคำตอบให้เป็น 2 ทางเท่านั้น
+  switch (userMsg) {
+    case 'ยินยอม':
+      // บันทึก Consent ลง Sheets
+      await saveConsentToSheets(userId, 'ยินยอม');
+      
+      // ส่งไปขอข้อมูลส่วนตัว
+      await replyFlexMessage(event.replyToken, userInfoFlexMessage(userId));
+      userStates.set(userId, 'collecting_info');
       break;
-    
-    case 'ช่วยเหลือ':
-    case 'help':
-      await showHelp(event.replyToken);
+
+    case 'ไม่ยินยอม':
+      // บันทึก Consent ลง Sheets
+      await saveConsentToSheets(userId, 'ไม่ยินยอม');
+      
+      await replyMessage(event.replyToken,
+        `❌ ขออภัย คุณต้องยินยอมก่อนจึงจะใช้งานได้
+        
+หากเปลี่ยนใจ สามารถพิมพ์ "ยินยอม" ได้ตลอดเวลา`
+      );
       break;
-    
+
     default:
-      await handleTaxQuestions(event, userMsg, userId, userState);
+      // ถ้าพิมพ์อะไรที่ไม่ใช่ "ยินยอม"/"ไม่ยินยอม" -> ส่ง Consent ใหม่
+      await replyFlexMessage(event.replyToken, consentFlexMessage);
   }
 }
 
-async function startTaxCalculation(event, userId) {
-  userTaxData.set(userId, {
-    state: 'asking_income_type',
-    data: {}
-  });
+async function handleUserInfoFlow(event, userMsg, userId) {
+  switch (userMsg) {
+    case 'ตัวอย่างการกรอก':
+      await replyFlexMessage(event.replyToken, exampleFlexMessage);
+      break;
 
-  await replyMessage(event.replyToken,
-`💰 *เริ่มคำนวณภาษี*
+    case 'กรอกข้อมูล':
+      await replyMessage(event.replyToken,
+        `📝 พิมพ์ข้อมูลในรูปแบบ:
+ชื่อ นามสกุล อีเมล
 
-รายได้หลักของคุณมาจากช่องทางใด?
-1. เงินเดือน
-2. ฟรีแลนซ์  
-3. ธุรกิจส่วนตัว
-4. อื่นๆ
+เช่น: สมชาย ใจดี somchai@gmail.com`
+      );
+      break;
 
-พิมพ์ตัวเลขหรือชื่อประเภทรายได้`
-  );
+    case 'ข้ามการกรอก':
+      // บันทึกว่าข้ามการกรอก
+      await saveUserInfoToSheets(userId, { skipped: true });
+      userStates.delete(userId);
+      
+      await replyMessage(event.replyToken,
+        `✅ ข้ามการกรอกข้อมูลแล้ว
+
+คุณสามารถใช้งานเมนูด้านล่างได้เลย! 🚀`
+      );
+      break;
+
+    default:
+      // พยายามประมวลผลเป็นข้อมูลผู้ใช้
+      await processUserInfo(event, userMsg, userId);
+  }
 }
 
-async function showHelp(replyToken) {
-  await replyMessage(replyToken,
-`📋 *คำสั่งทั้งหมด*
+async function processUserInfo(event, userMsg, userId) {
+  const parts = userMsg.split(' ');
+  
+  if (parts.length >= 3) {
+    const firstName = parts[0];
+    const lastName = parts[1];
+    const email = parts[2];
 
-• คำนวณภาษี - เริ่มคำนวณภาษี
-• ช่วยเหลือ - แสดงคำสั่งนี้
-• ยกเลิก - ออกจากโหมดคำนวณ
+    if (!email.includes('@')) {
+      await replyMessage(event.replyToken,
+        `❌ อีเมลไม่ถูกต้อง
+        
+กรุณากรอกอีเมลให้ถูกต้อง格式`
+      );
+      return;
+    }
 
-เราจะช่วยคุณ:
-✅ คำนวณภาษีที่ต้องชำระ
-✅ ให้คำแนะนำการลดหย่อน
-✅ เตรียมความพร้อมยื่นภาษี`
-  );
+    // บันทึกข้อมูลส่วนตัวลง Sheets
+    const userData = {
+      firstName,
+      lastName,
+      email,
+      timestamp: new Date().toISOString()
+    };
+
+    await saveUserInfoToSheets(userId, userData);
+    userProfiles.set(userId, userData);
+    userStates.delete(userId);
+
+    await replyMessage(event.replyToken,
+      `✅ บันทึกข้อมูลเรียบร้อย!
+ขอบคุณ ${firstName}
+
+ตอนนี้คุณสามารถใช้งานเมนูด้านล่างได้เต็มที่แล้ว 🚀`
+    );
+
+  } else {
+    // ถ้ารูปแบบไม่ถูกต้อง
+    await replyMessage(event.replyToken,
+      `❌ รูปแบบไม่ถูกต้อง
+
+กรุณากรอก: ชื่อ นามสกุล อีเมล
+
+หรือใช้ปุ่ม "ข้ามการกรอก" หากต้องการใช้งานทันที`
+    );
+  }
 }
 
-async function handleTaxQuestions(event, userMsg, userId, userState) {
-  // Logic สำหรับถามคำถามภาษีตาม state
-  // (จะ implement เต็มใน phase 2)
+async function handleMainMenu(event, userMsg, userId) {
+  // ฟังก์ชัน Rich Menu หลัก
+  // (จะ implement เต็มใน Phase ต่อไป)
   await replyMessage(event.replyToken,
-`🔧 ระบบคำนวณภาษีกำลังพัฒนาเร็วๆ นี้!
+    `🎉 ยินดีต้อนรับกลับ!
 
-ขณะนี้สามารถให้คำแนะนำเบื้องต้นได้
-
-พิมพ์ "ช่วยเหลือ" เพื่อดูคำสั่ง`
+คุณสามารถใช้งานเมนูด้านล่างได้เลย
+    
+เร็วๆ นี้จะมีฟังก์ชันเหล่านี้:
+• 📊 คำนวณภาษี
+• 📈 การลงทุนลดหย่อน  
+• 🛡️ ประกันชีวิต
+• 🎯 แผนเกษียณ
+• 💵 บันทึกรายรับรายจ่าย`
   );
 }
