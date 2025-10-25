@@ -29,7 +29,11 @@ app.get('/', (req, res) => {
 });
 
 // Webhook - ใช้ Router จัดการ
-app.post('/webhook', line.middleware(config), async (req, res) => {
+app.post('/webhook', line.middleware({
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.LINE_CHANNEL_SECRET
+}), async (req, res) => {
+  
   try {
     console.log('📨 Received webhook');
     const events = req.body.events;
