@@ -1,17 +1,27 @@
-import express from 'express';
-import bodyParser from 'body-parser';
+require('dotenv').config();
+const express = require('express');
+const line = require('@line/bot-sdk');
 
 const app = express();
-app.use(bodyParser.json());
+const port = process.env.PORT || 3000;
 
-app.get('/', (req, res) => {
-  res.json({ status: 'OK', service: 'Nong-Fin Bot' });
+// ตั้งค่า Line
+const config = {
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.LINE_CHANNEL_SECRET
+};
+
+// เมื่อมีคนส่งข้อความมา
+app.post('/webhook', line.middleware(config), (req, res) => {
+  req.body.events.forEach(event => {
+    if (event.type === 'message') {
+      console.log('ได้รับข้อความ:', event.message.text);
+    }
+  });
+  res.json({ success: true });
 });
 
-// ✅ ต้องมีบรรทัดนี้
-app.post('/webhook', (req, res) => {
-  console.log('📩 Webhook received');
-  res.status(200).json({ status: 'OK' });
+// เริ่มทำงาน
+app.listen(port, () => {
+  console.log(`บอทเริ่มทำงานที่พอร์ต ${port}`);
 });
-
-export default app;
