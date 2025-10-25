@@ -30,6 +30,15 @@ app.post('/webhook', line.middleware(config), (req, res) => {
   res.json({ success: true });
 });
 
+// เพิ่มก่อน app.listen
+app.get('/', (req, res) => {
+  res.json({ 
+    status: '✅ บอททำงานปกติ',
+    service: 'Nong Fin Bot',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // เริ่มทำงาน
 app.listen(port, () => {
   console.log(`บอทเริ่มทำงานที่พอร์ต ${port}`);
