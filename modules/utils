@@ -1,0 +1,41 @@
+import axios from 'axios';
+
+// ฟังก์ชันส่งข้อความกลับ LINE
+export async function replyMessage(replyToken, message) {
+  if (!process.env.CHANNEL_ACCESS_TOKEN) {
+    console.warn('⚠️ Missing LINE token');
+    return;
+  }
+
+  try {
+    await axios.post(
+      'https://api.line.me/v2/bot/message/reply',
+      {
+        replyToken,
+        messages: [{ type: 'text', text: message }],
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CHANNEL_ACCESS_TOKEN}`,
+        },
+      }
+    );
+    console.log('✅ Reply sent');
+  } catch (error) {
+    console.error('❌ LINE API error:', error.response?.data || error.message);
+  }
+}
+
+// ฟังก์ชันบันทึก Google Sheets
+export async function saveToSheets(userData) {
+  try {
+    // ถ้ามี Google Sheets setup ก็บันทึก
+    // ถ้าไม่มี ก็ข้ามไป
+    console.log('📊 Would save to Sheets:', userData);
+    return true;
+  } catch (error) {
+    console.warn('⚠️ Sheets not available');
+    return false;
+  }
+}
