@@ -4,42 +4,52 @@ const line = require('@line/bot-sdk');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ตรวจสอบก่อนใช้
-if (!process.env.LINE_CHANNEL_SECRET) {
-  console.error('❌ LINE_CHANNEL_SECRET is missing');
-  process.exit(1);
-}
-
+// ตั้งค่า Line
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.LINE_CHANNEL_SECRET
 };
 
-console.log('✅ Config loaded:', {
-  hasToken: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  hasSecret: !!process.env.LINE_CHANNEL_SECRET
-});
+const client = new line.Client(config);
 
-// เมื่อมีคนส่งข้อความมา
-app.post('/webhook', line.middleware(config), (req, res) => {
-  req.body.events.forEach(event => {
-    if (event.type === 'message') {
-      console.log('ได้รับข้อความ:', event.message.text);
-    }
-  });
-  res.json({ success: true });
-});
+// ✅ นำเข้า Router
+const { MessageRouter } = require('./modules/core/router');
+const messageRouter = new MessageRouter();
 
-// เพิ่มก่อน app.listen
+// Middleware
+app.use(express.json());
+
+// Routes
 app.get('/', (req, res) => {
   res.json({ 
     status: '✅ บอททำงานปกติ',
-    service: 'Nong Fin Bot',
+    service: 'Nong Fin Bot', 
     timestamp: new Date().toISOString()
   });
 });
 
-// เริ่มทำงาน
+// Webhook - ใช้ Router จัดการ
+app.post('/webhook', line.middleware(config), async (req, res) => {
+  try {
+    console.log('📨 Received webhook');
+    const events = req.body.events;
+    
+    // Process events
+    for (const event of events) {
+      if (event.type === 'message') {
+        await messageRouter.handleMessage(event);
+      }
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(500).end();
+  }
+});
+
+// Start server
 app.listen(port, () => {
-  console.log(`บอทเริ่มทำงานที่พอร์ต ${port}`);
+  console.log(`✅ Config loaded: { hasToken: true, hasSecret: true }`);
+  console.log(`🚀 บอทเริ่มทำงานที่พอร์ต ${port}`);
 });
