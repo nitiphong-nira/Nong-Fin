@@ -4,11 +4,21 @@ const line = require('@line/bot-sdk');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ตั้งค่า Line
+// ตรวจสอบก่อนใช้
+if (!process.env.LINE_CHANNEL_SECRET) {
+  console.error('❌ LINE_CHANNEL_SECRET is missing');
+  process.exit(1);
+}
+
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.LINE_CHANNEL_SECRET
 };
+
+console.log('✅ Config loaded:', {
+  hasToken: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
+  hasSecret: !!process.env.LINE_CHANNEL_SECRET
+});
 
 // เมื่อมีคนส่งข้อความมา
 app.post('/webhook', line.middleware(config), (req, res) => {
