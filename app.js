@@ -1,59 +1,22 @@
 const express = require('express');
-const line = require('@line/bot-sdk');
+// const line = require('@line/bot-sdk'); // ← ลบบรรทัดนี้ชั่วคราว
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ตั้งค่า Line
-const config = {
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET
-};
-
-const client = new line.Client(config);
-
-// ✅ นำเข้า Router
-const { MessageRouter } = require('./modules/core/router');
-const messageRouter = new MessageRouter();
-
-// Middleware
 app.use(express.json());
 
-// Routes
 app.get('/', (req, res) => {
-  res.json({ 
-    status: '✅ บอททำงานปกติ',
-    service: 'Nong Fin Bot', 
-    timestamp: new Date().toISOString()
-  });
+  res.json({ status: '✅ บอททำงานปกติ', timestamp: new Date().toISOString() });
 });
 
-// Webhook - ใช้ Router จัดการ
-app.post('/webhook', line.middleware({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET
-}), async (req, res) => {
-  
-  try {
-    console.log('📨 Received webhook');
-    const events = req.body.events;
-    
-    // Process events
-    for (const event of events) {
-      if (event.type === 'message') {
-        await messageRouter.handleMessage(event);
-      }
-    }
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(500).end();
-  }
+// Webhook อย่างง่าย (ไม่ใช้ Line middleware ชั่วคราว)
+app.post('/webhook', (req, res) => {
+  console.log('📨 Received webhook (raw):', req.body);
+  res.json({ success: true, message: 'Received' });
 });
 
-// Start server
 app.listen(port, () => {
-  console.log(`✅ Config loaded: { hasToken: true, hasSecret: true }`);
   console.log(`🚀 บอทเริ่มทำงานที่พอร์ต ${port}`);
+  console.log('🔍 Mode: Simple webhook (no Line SDK)');
 });
