@@ -4,10 +4,10 @@ const line = require('@line/bot-sdk');
 const app = express();
 const port = process.env.PORT || 8080;
 
-// ใช้ environment variables ธรรมดา
+// ใช้ String() เพื่อบังคับให้เป็น string
 const config = {
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET
+  channelAccessToken: String(process.env.LINE_CHANNEL_ACCESS_TOKEN),
+  channelSecret: String(process.env.LINE_CHANNEL_SECRET)
 };
 
 console.log('🔍 GCP Config check:', {
