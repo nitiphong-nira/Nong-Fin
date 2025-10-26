@@ -6,12 +6,12 @@ class ConsentManager {
     this.userConsentDB = new Map(); // ชั่วคราวแทน Google Sheets
   }
 
-  checkConsentResponse(text) {
-    const response = text.toLowerCase().trim();
-    if (['ยินยอม', 'yes', 'y', 'ตกลง'].includes(response)) return 'accepted';
-    if (['ไม่ยินยอม', 'no', 'n', 'ปฏิเสธ'].includes(response)) return 'rejected';
-    return 'other';
-  }
+ checkConsentResponse(text) {
+  const response = text.toLowerCase().trim();
+  if (['ยินยอม', 'yes', 'y', 'ตกลง', 'ย'].includes(response)) return 'accepted';
+  if (['ไม่ยินยอม', 'no', 'n', 'ปฏิเสธ', 'ไม่'].includes(response)) return 'rejected';
+  return 'other';
+}
 
   async handleUserMessage(userId, userMessage, replyToken) {
     console.log(`🔍 ตรวจสอบ user ${userId}: ${userMessage}`);
