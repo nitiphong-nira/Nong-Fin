@@ -1,19 +1,64 @@
-const line = require('@line/bot-sdk');
-const config = require('../../config/line-config');
+const axios = require('axios');
 
-const client = new line.Client(config);
-
-class LineHandler {
-  static async handleEvent(event) {
-    if (event.type === 'message') {
-      return await this.handleMessage(event);
+class LineManager {
+  static async sendMessage(replyToken, message) {
+    try {
+      const response = await axios.post(
+        'https://api.line.me/v2/bot/message/reply',
+        {
+          replyToken: replyToken,
+          messages: Array.isArray(message) ? message : [message]
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      console.log('✅ ส่งข้อความสำเร็จ');
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('❌ ส่งข้อความไม่สำเร็จ:', {
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      return { success: false, error: error.message };
     }
   }
 
-  static async handleMessage(event) {
-    console.log('ได้รับข้อความ:', event.message.text);
-    // ส่งต่อให้ router จัดการ
+  static async getUserProfile(userId) {
+    try {
+      const response = await axios.get(
+        `https://api.line.me/v2/bot/profile/${userId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`
+          }
+        }
+      );
+      console.log('✅ รับข้อมูลผู้ใช้สำเร็จ');
+      return { success: true, profile: response.data };
+    } catch (error) {
+      console.error('❌ รับข้อมูลผู้ใช้ไม่สำเร็จ:', error.response?.data);
+      return { success: false, profile: null };
+    }
+  }
+
+  static async sendFlexMessage(replyToken, flexContent) {
+    return await this.sendMessage(replyToken, {
+      type: 'flex',
+      altText: 'Flex Message',
+      contents: flexContent
+    });
+  }
+
+  static async sendTextMessage(replyToken, text) {
+    return await this.sendMessage(replyToken, {
+      type: 'text',
+      text: text
+    });
   }
 }
 
-module.exports = LineHandler;
+module.exports = LineManager;
