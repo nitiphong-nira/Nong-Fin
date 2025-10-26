@@ -25,30 +25,33 @@ class ConsentManager {
   }
 
  async handleNewUser(userId, userMessage, replyToken) {
-  const consentResult = this.checkConsentResponse(userMessage);
+  console.log('🔍 [DEBUG] Testing message send...');
   
-  if (consentResult === 'accepted') {
-    this.userConsentDB.set(userId, { consented: true, timestamp: new Date() });
-    await LineManager.sendTextMessage(replyToken, '🎉 ขอบคุณที่ยินยอม! กรุณาเลือกเมนูที่ต้องการด้านล่าง');
-    console.log(`✅ User ${userId} ยินยอมแล้ว`);
-    return 'accepted';
-    
-  } else if (consentResult === 'rejected') {
-    this.userConsentDB.set(userId, { consented: false, timestamp: new Date() });
-    await LineManager.sendTextMessage(replyToken, 'ขอบคุณที่ให้ความสนใจ 😊');
-    console.log(`❌ User ${userId} ไม่ยินยอม`);
-    return 'rejected';
-    
-  } else {
-    // 📝 ส่งข้อความธรรมดาแทน Flex Message (ชั่วคราว)
-    await LineManager.sendTextMessage(replyToken, 
-      `📜 กรุณายินยอมข้อกำหนดก่อนใช้งาน\n\n` +
-      `น้องฟินจะเก็บข้อมูลเพื่อบริการที่ดีขึ้น\n\n` +
-      `พิมพ์ "ยินยอม" หรือ "ไม่ยินยอม"`
+  // ทดสอบส่งข้อความง่ายๆ แบบ manual
+  try {
+    const axios = require('axios');
+    const response = await axios.post(
+      'https://api.line.me/v2/bot/message/reply',
+      {
+        replyToken: replyToken,
+        messages: [{ 
+          type: 'text', 
+          text: 'ทดสอบข้อความจาก manual axios' 
+        }]
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      }
     );
-    console.log(`📝 ส่ง Consent ข้อความธรรมดาให้ ${userId}`);
-    return 'sent_consent';
+    console.log('✅ Manual send success:', response.status);
+  } catch (error) {
+    console.error('❌ Manual send failed:', error.response?.data);
   }
+  
+  return 'sent_consent';
 }
 
   async handleExistingUser(userId, userMessage, replyToken) {
