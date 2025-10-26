@@ -1,5 +1,5 @@
 const express = require('express');
-const line = require('@line/bot-sdk');
+const line = require('line-bot-sdk-nodejs');
 
 const app = express();
 const port = process.env.PORT || 8080;
