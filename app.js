@@ -1,6 +1,4 @@
 const express = require('express');
-// const line = require('@line/bot-sdk'); // ← ยังไม่ใช้
-
 const app = express();
 const port = process.env.PORT || 8080;
 
