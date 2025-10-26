@@ -19,12 +19,24 @@ class LineManager {
       console.log('✅ ส่งข้อความสำเร็จ');
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('❌ ส่งข้อความไม่สำเร็จ:', {
-        status: error.response?.status,
-        data: error.response?.data
-      });
+      console.error('❌ ส่งข้อความไม่สำเร็จ:', error.response?.data);
       return { success: false, error: error.message };
     }
+  }
+
+  static async sendTextMessage(replyToken, text) {
+    return await this.sendMessage(replyToken, {
+      type: 'text',
+      text: text
+    });
+  }
+
+  static async sendFlexMessage(replyToken, flexContent) {
+    return await this.sendMessage(replyToken, {
+      type: 'flex',
+      altText: 'Flex Message',
+      contents: flexContent
+    });
   }
 
   static async getUserProfile(userId) {
@@ -37,27 +49,11 @@ class LineManager {
           }
         }
       );
-      console.log('✅ รับข้อมูลผู้ใช้สำเร็จ');
       return { success: true, profile: response.data };
     } catch (error) {
-      console.error('❌ รับข้อมูลผู้ใช้ไม่สำเร็จ:', error.response?.data);
+      console.error('รับข้อมูลผู้ใช้ไม่สำเร็จ:', error.response?.data);
       return { success: false, profile: null };
     }
-  }
-
-  static async sendFlexMessage(replyToken, flexContent) {
-    return await this.sendMessage(replyToken, {
-      type: 'flex',
-      altText: 'Flex Message',
-      contents: flexContent
-    });
-  }
-
-  static async sendTextMessage(replyToken, text) {
-    return await this.sendMessage(replyToken, {
-      type: 'text',
-      text: text
-    });
   }
 }
 
