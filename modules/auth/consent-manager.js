@@ -25,33 +25,42 @@ class ConsentManager {
   }
 
  async handleNewUser(userId, userMessage, replyToken) {
-  console.log('🔍 [DEBUG] Testing message send...');
+  const consentResult = this.checkConsentResponse(userMessage);
   
-  // ทดสอบส่งข้อความง่ายๆ แบบ manual
-  try {
-    const axios = require('axios');
-    const response = await axios.post(
-      'https://api.line.me/v2/bot/message/reply',
-      {
-        replyToken: replyToken,
-        messages: [{ 
-          type: 'text', 
-          text: 'ทดสอบข้อความจาก manual axios' 
-        }]
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    console.log('✅ Manual send success:', response.status);
-  } catch (error) {
-    console.error('❌ Manual send failed:', error.response?.data);
+  if (consentResult === 'accepted') {
+    this.userConsentDB.set(userId, { consented: true, timestamp: new Date() });
+    await this.sendManualMessage(replyToken, '🎉 ขอบคุณที่ยินยอม! กรุณาเลือกเมนูที่ต้องการด้านล่าง');
+    console.log(`✅ User ${userId} ยินยอมแล้ว`);
+    return 'accepted';
+    
+  } else if (consentResult === 'rejected') {
+    this.userConsentDB.set(userId, { consented: false, timestamp: new Date() });
+    await this.sendManualMessage(replyToken, 'ขอบคุณที่ให้ความสนใจ 😊');
+    console.log(`❌ User ${userId} ไม่ยินยอม`);
+    return 'rejected';
+    
+  } else {
+    // ส่ง Consent Message แบบชัดเจน
+    const consentText = 
+`📜 **นโยบายความเป็นส่วนตัว (PDPA Consent)**\n\n` +
+      `น้องฟินจะเก็บและใช้ข้อมูลต่อไปนี้เพื่อให้บริการ:\n` +
+      `• ข้อความที่คุณพิมพ์ในแชท\n` +
+      `• ข้อมูลผู้ใช้ (LINE userId)\n` +
+      `• คำตอบในการคำนวณหรือวางแผนการเงิน\n\n` +
+      `ข้อมูลจะถูกเก็บไว้เพื่อ:\n` +
+      `✅ ให้คำแนะนำด้านการเงินส่วนบุคคล\n` +
+      `✅ ปรับปรุงบริการและประสบการณ์การใช้งาน\n` +
+      `❌ จะไม่เปิดเผยแก่บุคคลที่สามโดยไม่ได้รับอนุญาต\n\n` +
+      `อ่านรายละเอียดนโยบายเต็มได้ที่:\n` +
+      `👉 https://www.notion.so/Privacy-Policy-28b3d2318ce980b98771db7919f6ff20?source=copy_link\n\n` +
+      `คุณยินยอมให้น้องฟินเก็บข้อมูลส่วนตัวเพื่อให้บริการหรือไม่?\n\n` +
+      `ถ้ายินยอมให้ พิมพ์ "Y"\n` +
+      `หรือถ้าไม่ยินยอมให้ พิมพ์ "N"`;
+    
+    await this.sendManualMessage(replyToken, consentText);
+    console.log(`📝 ส่ง Consent Message ให้ ${userId}`);
+    return 'sent_consent';
   }
-  
-  return 'sent_consent';
 }
 
   async handleExistingUser(userId, userMessage, replyToken) {
