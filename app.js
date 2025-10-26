@@ -1,27 +1,35 @@
 const express = require('express');
+// const line = require('@line/bot-sdk'); // ← ยังคอมเมนต์อยู่
+
 const app = express();
 const port = process.env.PORT || 8080;
 
-// ใช้ String() เพื่อบังคับให้เป็น string
-const config = {
-  channelAccessToken: String(process.env.LINE_CHANNEL_ACCESS_TOKEN),
-  channelSecret: String(process.env.LINE_CHANNEL_SECRET)
-};
-
-console.log('🔍 GCP Config check:', {
-  hasToken: !!config.channelAccessToken,
-  hasSecret: !!config.channelSecret
+// ตรวจสอบ environment variables
+console.log('🔍 ENV Check:', {
+  token: process.env.LINE_CHANNEL_ACCESS_TOKEN ? '✅ มี' : '❌ ไม่มี',
+  secret: process.env.LINE_CHANNEL_SECRET ? '✅ มี' : '❌ ไม่มี',
+  sheet: process.env.GOOGLE_SHEET_ID ? '✅ มี' : '❌ ไม่มี'
 });
-
-const client = new line.Client(config);
 
 app.use(express.json());
 
 app.get('/', (req, res) => {
   res.json({ 
-    status: '✅ บอททำงานปกติบน GCP',
-    timestamp: new Date().toISOString() 
+    status: '✅ บอททำงานปกติ',
+    env: {
+      hasToken: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
+      hasSecret: !!process.env.LINE_CHANNEL_SECRET
+    }
   });
+});
+
+app.post('/webhook', (req, res) => {
+  console.log('📨 Received webhook');
+  res.json({ success: true });
+});
+
+app.listen(port, () => {
+  console.log(`🚀 บอทเริ่มทำงานที่พอร์ต ${port}`);
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
