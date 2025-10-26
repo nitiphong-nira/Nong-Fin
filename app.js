@@ -5,12 +5,11 @@ const port = process.env.PORT || 8080;
 console.log('🚀 Starting server...');
 
 app.get('/', (req, res) => {
-  console.log('✅ Root accessed');
-  res.send('Bot is running!');
+  res.send('✅ Bot is running!');
 });
 
 app.post('/webhook', (req, res) => {
-  console.log('✅ Webhook received');
+  console.log('📨 Webhook received');
   res.send('OK');
 });
 
