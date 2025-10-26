@@ -24,31 +24,32 @@ class ConsentManager {
     }
   }
 
-  async handleNewUser(userId, userMessage, replyToken) {
-    const consentResult = this.checkConsentResponse(userMessage);
+ async handleNewUser(userId, userMessage, replyToken) {
+  const consentResult = this.checkConsentResponse(userMessage);
+  
+  if (consentResult === 'accepted') {
+    this.userConsentDB.set(userId, { consented: true, timestamp: new Date() });
+    await LineManager.sendTextMessage(replyToken, '🎉 ขอบคุณที่ยินยอม! กรุณาเลือกเมนูที่ต้องการด้านล่าง');
+    console.log(`✅ User ${userId} ยินยอมแล้ว`);
+    return 'accepted';
     
-    if (consentResult === 'accepted') {
-      // ยินยอมแล้ว
-      this.userConsentDB.set(userId, { consented: true, timestamp: new Date() });
-      await LineManager.sendTextMessage(replyToken, '🎉 ขอบคุณที่ยินยอม! กรุณาเลือกเมนูที่ต้องการด้านล่าง');
-      console.log(`✅ User ${userId} ยินยอมแล้ว`);
-      return 'accepted';
-      
-    } else if (consentResult === 'rejected') {
-      // ไม่ยินยอม
-      this.userConsentDB.set(userId, { consented: false, timestamp: new Date() });
-      await LineManager.sendTextMessage(replyToken, 'ขอบคุณที่ให้ความสนใจ 😊');
-      console.log(`❌ User ${userId} ไม่ยินยอม`);
-      return 'rejected';
-      
-    } else {
-      // ส่ง Consent Form
-      const flexMessage = createConsentFlex();
-      await LineManager.sendFlexMessage(replyToken, flexMessage);
-      console.log(`📝 ส่ง Consent Form ให้ ${userId}`);
-      return 'sent_consent';
-    }
+  } else if (consentResult === 'rejected') {
+    this.userConsentDB.set(userId, { consented: false, timestamp: new Date() });
+    await LineManager.sendTextMessage(replyToken, 'ขอบคุณที่ให้ความสนใจ 😊');
+    console.log(`❌ User ${userId} ไม่ยินยอม`);
+    return 'rejected';
+    
+  } else {
+    // 📝 ส่งข้อความธรรมดาแทน Flex Message (ชั่วคราว)
+    await LineManager.sendTextMessage(replyToken, 
+      `📜 กรุณายินยอมข้อกำหนดก่อนใช้งาน\n\n` +
+      `น้องฟินจะเก็บข้อมูลเพื่อบริการที่ดีขึ้น\n\n` +
+      `พิมพ์ "ยินยอม" หรือ "ไม่ยินยอม"`
+    );
+    console.log(`📝 ส่ง Consent ข้อความธรรมดาให้ ${userId}`);
+    return 'sent_consent';
   }
+}
 
   async handleExistingUser(userId, userMessage, replyToken) {
     const userData = this.userConsentDB.get(userId);
