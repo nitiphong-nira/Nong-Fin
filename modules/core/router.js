@@ -10,31 +10,42 @@ class MessageRouter {
   }
 
   async handleMessage(event) {
+  console.log('🔍 [Router] handleMessage START');
+  
+  try {
     const { replyToken, message, source } = event;
     const userId = source.userId;
     const userMessage = message.text;
 
     console.log(`💬 User ${userId} said: ${userMessage}`);
 
-    try {
-      // ตรวจสอบคำสั่ง Admin
-      const adminResult = await this.handleAdminCommand(userId, userMessage, replyToken);
-      if (adminResult.handled) return;
+    // ตรวจสอบคำสั่ง Admin
+    console.log('🔍 [Router] Checking admin commands...');
+    const adminResult = await this.handleAdminCommand(userId, userMessage, replyToken);
+    if (adminResult.handled) return;
 
-      // ตรวจสอบการหยุดชั่วคราว
-      if (this.botPaused && userId !== this.ADMIN_ID) {
-        await LineManager.sendTextMessage(replyToken, '⏸️ บอทกำลังปิดปรับปรุง กรุณารอสักครู่');
-        return;
-      }
-
-      // ตรวจสอบ Consent และประมวลผลข้อความ
-      await this.handleUserMessage(userId, userMessage, replyToken);
-
-    } catch (error) {
-      console.error('❌ Router error:', error);
-      await LineManager.sendTextMessage(replyToken, 'ขออภัย เกิดข้อผิดพลาด กรุณาลองใหม่');
+    // ตรวจสอบการหยุดชั่วคราว
+    console.log('🔍 [Router] Checking bot pause...');
+    if (this.botPaused && userId !== this.ADMIN_ID) {
+      // ใช้ LineManager แทน sendManualMessage
+      const LineManager = require('./line-manager');
+      await LineManager.sendTextMessage(replyToken, '⏸️ บอทกำลังปิดปรับปรุง');
+      return;
     }
+
+    // ตรวจสอบ Consent
+    console.log('🔍 [Router] Calling handleUserMessage...');
+    await this.handleUserMessage(userId, userMessage, replyToken);
+    
+    console.log('🔍 [Router] handleMessage COMPLETE');
+
+  } catch (error) {
+    console.error('❌ Router error:', error);
+    // ใช้ LineManager แทน sendManualMessage
+    const LineManager = require('./line-manager');
+    await LineManager.sendTextMessage(replyToken, 'ขออภัย เกิดข้อผิดพลาด กรุณาลองใหม่');
   }
+}
 
   async handleAdminCommand(userId, userMessage, replyToken) {
     if (userId !== this.ADMIN_ID) return { handled: false };
