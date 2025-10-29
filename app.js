@@ -1,20 +1,22 @@
 const express = require('express');
-const MessageRouter = require('./modules/core/router'); // ✅ ลบ { }
+const { MessageRouter } = require('./modules/core/router'); // ✅ ใช้ { } ถูกต้องแล้ว
 
 const app = express();
 const port = process.env.PORT || 8080;
 
-// ✅ เพิ่ม error handling
+// ✅ เพิ่ม try-catch ให้ router initialization
 let messageRouter;
 try {
   messageRouter = new MessageRouter();
   console.log('✅ MessageRouter initialized successfully');
 } catch (error) {
   console.error('❌ MessageRouter initialization failed:', error);
-  // สร้าง fallback router
+  // Fallback router
   messageRouter = {
     handleMessage: async (event) => {
-      console.log('⚠️  Fallback handler for event:', event.type);
+      console.log('⚠️  Fallback handler');
+      const LineManager = require('./modules/core/line-manager');
+      await LineManager.sendTextMessage(event.replyToken, '🚧 บอทกำลังปรับปรุงระบบ');
     }
   };
 }
@@ -28,8 +30,7 @@ app.get('/', (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    service: 'Nong Fin Bot'
+    timestamp: new Date().toISOString() 
   });
 });
 
@@ -40,28 +41,17 @@ app.post('/webhook', async (req, res) => {
     
     if (events && Array.isArray(events)) {
       for (const event of events) {
-        if (event.type === 'message' && event.message.type === 'text') {
-          await messageRouter.handleMessage(event);
-        }
+        await messageRouter.handleMessage(event);
       }
     }
     
-    res.json({ success: true });
+    res.status(200).json({ success: true });
   } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(200).json({ success: false, error: error.message }); // ✅ ส่ง 200 ให้ Line
+    console.error('❌ Webhook error:', error);
+    res.status(200).json({ success: false }); // ✅ ส่ง 200 ให้ Line เสมอ
   }
 });
 
 app.listen(port, () => {
   console.log(`🚀 บอทเริ่มทำงานที่พอร์ต ${port}`);
-});
-
-// ✅ Handle uncaught errors
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
 });
