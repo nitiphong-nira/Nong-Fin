@@ -4,19 +4,19 @@ const SheetsManager = require('./sheets');
 class ConsentManager {
   constructor() {
     this.sheetsManager = new SheetsManager();
-    this.waitingForUserInfo = new Set(); // ✅ Track users who need to provide info
+    this.waitingForUserInfo = new Set();
   }
 
   async handleUserMessage(userId, userMessage, replyToken) {
     console.log(`🔍 ตรวจสอบ user ${userId}: ${userMessage}`);
     
-    // ✅ ตรวจสอบจาก Google Sheets จริง
-    const hasConsented = await this.sheetsManager.checkUserConsent(userId);
+    // ✅ เปลี่ยนเป็น method ที่มีอยู่ใน sheets.js
+    const userData = await this.sheetsManager.getUserById(userId);
+    const hasConsented = userData && userData.consent === 'ยินยอม';
     
     if (!hasConsented) {
       return await this.handleNewUser(userId, userMessage, replyToken);
     } else {
-      // ✅ ถ้ายินยอมแล้ว แต่กำลังรอข้อมูลส่วนตัว
       if (this.waitingForUserInfo.has(userId)) {
         return await this.handleUserInfoInput(userId, userMessage, replyToken);
       }
@@ -25,14 +25,13 @@ class ConsentManager {
   }
 
   async handleNewUser(userId, userMessage, replyToken) {
-    // ✅ ตรวจสอบเฉพาะ "ยินยอม" หรือ "ไม่ยินยอม" เท่านั้น
     if (userMessage === 'ยินยอม') {
+      // ✅ ใช้ method ที่มีอยู่
       await this.sheetsManager.saveConsent(userId, 'ยินยอม');
       
-      // ✅ ส่ง Rich Menu ทันที
-      await LineManager.sendRichMenu(userId);
+      // ✅ ใช้ method ที่มีอยู่ใน line-manager (หรือสร้างใหม่)
+      await this.sendToRichMenu(userId);
       
-      // ✅ ขอข้อมูลส่วนตัว & track user
       await this.requestPersonalInfo(replyToken);
       this.waitingForUserInfo.add(userId);
       
@@ -42,22 +41,21 @@ class ConsentManager {
     } else if (userMessage === 'ไม่ยินยอม') {
       await this.sheetsManager.saveConsent(userId, 'ไม่ยินยอม');
       await LineManager.sendTextMessage(replyToken, 'ขอบคุณที่ให้ความสนใจ 😊');
-      console.log(`❌ User ${userId} ไม่ยินยอม`);
       return 'rejected';
       
     } else {
-      // ✅ ส่ง Rich Message ที่ล็อคคำตอบเท่านั้น
-      await this.sendConsentRichMessage(replyToken);
+      // ✅ ใช้ fallback จนกว่าจะสร้าง flex-consent.js
+      await this.sendFallbackConsentMessage(replyToken);
       return 'sent_consent';
     }
   }
 
   async handleUserInfoInput(userId, userMessage, replyToken) {
-    // ✅ พยายามแยกข้อมูลส่วนตัว
-    const userProfile = this.sheetsManager.parseUserInfo(userMessage);
+    // ✅ ย้าย method มาอยู่ที่นี่
+    const userProfile = this.parseUserInfo(userMessage);
     
     if (userProfile) {
-      // ✅ บันทึกข้อมูลส่วนตัว
+      // ✅ ใช้ method ที่มีอยู่
       await this.sheetsManager.saveUserProfile(userId, userProfile);
       this.waitingForUserInfo.delete(userId);
       
@@ -66,7 +64,6 @@ class ConsentManager {
       );
       return 'info_saved';
     } else {
-      // ✅ ข้อมูลไม่ครบ - ส่งตัวอย่างใหม่
       await LineManager.sendTextMessage(replyToken,
         '❌ กรุณากรอกข้อมูลให้ครบถ้วน\nรูปแบบ: ชื่อ นามสกุล อีเมล\nตัวอย่าง: สมชาย ใจดี somchai@email.com'
       );
@@ -74,10 +71,32 @@ class ConsentManager {
     }
   }
 
-  async sendConsentRichMessage(replyToken) {
-    // ✅ ต้องสร้างไฟล์ flex-consent.js สำหรับส่วนนี้
-    const { createConsentMessage } = require('../messages/flex-consent');
-    await LineManager.sendFlexMessage(replyToken, createConsentMessage());
+  // ✅ เพิ่ม method ใหม่
+  parseUserInfo(text) {
+    const parts = text.trim().split(/\s+/);
+    if (parts.length >= 3) {
+      return {
+        firstName: parts[0],
+        lastName: parts[1],
+        email: parts[2]
+      };
+    }
+    return null;
+  }
+
+  // ✅ Fallback จนกว่าจะมี flex-consent.js
+  async sendFallbackConsentMessage(replyToken) {
+    await LineManager.sendTextMessage(replyToken,
+      '📜 **กรุณายินยอมให้เก็บข้อมูลส่วนตัว**\n\n' +
+      'คุณยินยอมหรือไม่?\n\n' +
+      'พิมพ์ "ยินยอม" หรือ "ไม่ยินยอม"'
+    );
+  }
+
+  // ✅ ส่งไป Rich Menu (ต้องสร้าง method นี้ใน line-manager)
+  async sendToRichMenu(userId) {
+    // ชั่วคราวส่งข้อความแทน
+    await LineManager.sendTextMessageToUser(userId, '🎉 ยินดีต้อนรับสู่ Nong Fin!');
   }
 
   async requestPersonalInfo(replyToken) {
