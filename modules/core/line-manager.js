@@ -1,13 +1,60 @@
 const axios = require('axios');
 
 class LineManager {
-  // ✅ มีอยู่แล้ว
-  static async sendMessage(replyToken, message) { /* ... */ }
-  static async sendTextMessage(replyToken, text) { /* ... */ }
-  static async sendFlexMessage(replyToken, flexContent) { /* ... */ }
-  static async getUserProfile(userId) { /* ... */ }
+  static async sendMessage(replyToken, message) {
+    try {
+      const response = await axios.post(
+        'https://api.line.me/v2/bot/message/reply',
+        {
+          replyToken: replyToken,
+          messages: Array.isArray(message) ? message : [message]
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      console.log('✅ ส่งข้อความสำเร็จ');
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('❌ ส่งข้อความไม่สำเร็จ:', error.response?.data);
+      return { success: false, error: error.message };
+    }
+  }
 
-  // ✅ ต้องเพิ่ม method ใหม่เหล่านี้
+  static async sendTextMessage(replyToken, text) {
+    return await this.sendMessage(replyToken, {
+      type: 'text',
+      text: text
+    });
+  }
+
+  static async sendFlexMessage(replyToken, flexContent) {
+    return await this.sendMessage(replyToken, {
+      type: 'flex',
+      altText: 'Flex Message',
+      contents: flexContent
+    });
+  }
+
+  static async getUserProfile(userId) {
+    try {
+      const response = await axios.get(
+        `https://api.line.me/v2/bot/profile/${userId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`
+          }
+        }
+      );
+      return { success: true, profile: response.data };
+    } catch (error) {
+      console.error('รับข้อมูลผู้ใช้ไม่สำเร็จ:', error.response?.data);
+      return { success: false, profile: null };
+    }
+  }
 
   /**
    * ส่งข้อความไปยังผู้ใช้โดยตรง (ไม่ใช้ replyToken)
@@ -48,6 +95,8 @@ class LineManager {
       
       if (!targetRichMenuId) {
         console.log('⚠️  ไม่มี Rich Menu ID ที่กำหนด');
+        // ✅ ส่งข้อความแทนถ้าไม่มี Rich Menu
+        await this.sendTextMessageToUser(userId, '🎉 ยินดีต้อนรับสู่ Nong Fin! กรุณาเลือกเมนูด้านล่าง');
         return { success: false, error: 'No Rich Menu ID specified' };
       }
 
@@ -66,6 +115,8 @@ class LineManager {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('❌ ผูก Rich Menu ไม่สำเร็จ:', error.response?.data);
+      // ✅ ส่งข้อความแทนถ้าเชื่อมต่อ Rich Menu ไม่ได้
+      await this.sendTextMessageToUser(userId, '🎉 ยินดีต้อนรับสู่ Nong Fin!');
       return { success: false, error: error.message };
     }
   }
@@ -106,6 +157,21 @@ class LineManager {
         }
       ]
     );
+  }
+
+  /**
+   * ✅ เพิ่ม method ใหม่: ส่ง Consent Flex Message
+   */
+  static async sendConsentFlexMessage(replyToken) {
+    try {
+      const { createConsentFlex } = require('../messages/flex-consent');
+      const flexContent = createConsentFlex();
+      return await this.sendFlexMessage(replyToken, flexContent.contents);
+    } catch (error) {
+      console.error('❌ ส่ง Consent Flex Message ไม่สำเร็จ:', error);
+      // ✅ Fallback ไปใช้ Confirm Template ถ้า Flex ไม่ทำงาน
+      return await this.sendConsentMessage(replyToken);
+    }
   }
 }
 
