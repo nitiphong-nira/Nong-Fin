@@ -29,8 +29,8 @@ class ConsentManager {
       // ✅ ใช้ method ที่มีอยู่
       await this.sheetsManager.saveConsent(userId, 'ยินยอม');
       
-      // ✅ ใช้ method ที่มีอยู่ใน line-manager (หรือสร้างใหม่)
-      await this.sendToRichMenu(userId);
+      // ✅ ใช้ method จริงจาก line-manager ที่เพิ่งสร้าง
+      await LineManager.linkRichMenuToUser(userId);
       
       await this.requestPersonalInfo(replyToken);
       this.waitingForUserInfo.add(userId);
@@ -44,10 +44,25 @@ class ConsentManager {
       return 'rejected';
       
     } else {
-      // ✅ ใช้ fallback จนกว่าจะสร้าง flex-consent.js
-      await this.sendFallbackConsentMessage(replyToken);
+      // ✅ ใช้ Flex Message แทน fallback
+      await LineManager.sendConsentFlexMessage(replyToken);
       return 'sent_consent';
     }
+  }
+
+  async handleExistingUser(userId, userMessage, replyToken) {
+    // ✅ ต้องเพิ่ม method นี้ (หายไป)
+    const userData = await this.sheetsManager.getUserById(userId);
+    const hasConsented = userData && userData.consent === 'ยินยอม';
+    
+    if (!hasConsented) {
+      await LineManager.sendTextMessage(replyToken, 'ขออภัย คุณไม่ยินยอมการใช้บริการ');
+      return 'rejected_user';
+    }
+    
+    // ✅ ส่ง Rich Menu สำหรับผู้ใช้ที่ยินยอมแล้ว
+    await LineManager.linkRichMenuToUser(userId);
+    return 'consented_user';
   }
 
   async handleUserInfoInput(userId, userMessage, replyToken) {
@@ -84,25 +99,22 @@ class ConsentManager {
     return null;
   }
 
-  // ✅ Fallback จนกว่าจะมี flex-consent.js
-  async sendFallbackConsentMessage(replyToken) {
-    await LineManager.sendTextMessage(replyToken,
-      '📜 **กรุณายินยอมให้เก็บข้อมูลส่วนตัว**\n\n' +
-      'คุณยินยอมหรือไม่?\n\n' +
-      'พิมพ์ "ยินยอม" หรือ "ไม่ยินยอม"'
-    );
-  }
+  // ❌ ลบ method นี้ (ไม่ใช้แล้ว)
+  // async sendFallbackConsentMessage(replyToken) { ... }
 
-  // ✅ ส่งไป Rich Menu (ต้องสร้าง method นี้ใน line-manager)
-  async sendToRichMenu(userId) {
-    // ชั่วคราวส่งข้อความแทน
-    await LineManager.sendTextMessageToUser(userId, '🎉 ยินดีต้อนรับสู่ Nong Fin!');
-  }
+  // ❌ ลบ method นี้ (ใช้ LineManager.linkRichMenuToUser โดยตรง)
+  // async sendToRichMenu(userId) { ... }
 
   async requestPersonalInfo(replyToken) {
     await LineManager.sendTextMessage(replyToken,
       '📝 กรุณากรอกข้อมูลส่วนตัว\nรูปแบบ: ชื่อ นามสกุล อีเมล\nตัวอย่าง: สมชาย ใจดี somchai@email.com'
     );
+  }
+
+  // ✅ เพิ่ม method ตรวจสอบการยินยอม
+  async hasUserConsented(userId) {
+    const userData = await this.sheetsManager.getUserById(userId);
+    return userData && userData.consent === 'ยินยอม';
   }
 }
 
