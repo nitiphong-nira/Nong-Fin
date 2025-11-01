@@ -44,24 +44,35 @@ class ConsentManager {
   }
 
   async handleNewUser(userId, userMessage, replyToken) {
-    console.log(`🆕 Handling new user: ${userId}, message: ${userMessage}`);
-    
-    if (userMessage === 'ยินยอม') {
-      await this.sheetsManager.saveConsent(userId, 'ยินยอม');
-      await LineManager.linkRichMenuToUser(userId);
-      await this.requestPersonalInfo(replyToken);
-      this.waitingForUserInfo.add(userId);
-      console.log(`✅ User ${userId} ยินยอมแล้ว - รอข้อมูลส่วนตัว`);
-      return 'accepted_awaiting_info';
-    } else if (userMessage === 'ไม่ยินยอม') {
-      await this.sheetsManager.saveConsent(userId, 'ไม่ยินยอม');
-      await LineManager.sendTextMessage(replyToken, 'ขอบคุณที่ให้ความสนใจ 😊');
-      return 'rejected';
-    } else {
+  console.log(`🆕 Handling new user: ${userId}, message: ${userMessage}`);
+  
+  if (userMessage === 'ยินยอม') {
+    await this.sheetsManager.saveConsent(userId, 'ยินยอม');
+    await LineManager.linkRichMenuToUser(userId);
+    await this.requestPersonalInfo(replyToken);
+    this.waitingForUserInfo.add(userId);
+    console.log(`✅ User ${userId} ยินยอมแล้ว - รอข้อมูลส่วนตัว`);
+    return 'accepted_awaiting_info';
+  } else if (userMessage === 'ไม่ยินยอม') {
+    await this.sheetsManager.saveConsent(userId, 'ไม่ยินยอม');
+    await LineManager.sendTextMessage(replyToken, 'ขอบคุณที่ให้ความสนใจ 😊');
+    return 'rejected';
+  } else {
+    try {
       await LineManager.sendConsentFlexMessage(replyToken);
       return 'sent_consent';
+    } catch (error) {
+      console.error('❌ Failed to send flex message:', error);
+      // Fallback to text message
+      await LineManager.sendTextMessage(replyToken,
+        '📜 **กรุณายินยอมให้เก็บข้อมูลส่วนตัว**\n\n' +
+        'คุณยินยอมให้น้องฟินเก็บข้อมูลเพื่อให้บริการหรือไม่?\n\n' +
+        'พิมพ์ "ยินยอม" หรือ "ไม่ยินยอม"'
+      );
+      return 'sent_consent_fallback';
     }
   }
+}
 
   async handleUserInfoInput(userId, userMessage, replyToken) {
     console.log(`📝 User info input: ${userMessage}`);
